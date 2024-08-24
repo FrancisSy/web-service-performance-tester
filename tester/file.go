@@ -2,7 +2,6 @@ package tester
 
 import (
 	"encoding/csv"
-	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -10,37 +9,30 @@ import (
 )
 
 func ReadCsv(path string) [][]string {
-	file, err := os.Open(path)
+	f, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	defer file.Close()
-	reader := csv.NewReader(file)
-	records, err := reader.ReadAll()
+	defer f.Close()
+	res, err := csv.NewReader(f).ReadAll()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var result [][]string
-	for _, r := range records {
-		result = append(result, r)
-	}
-
-	return result
+	return res
 }
 
-func DumpResponse(res []byte, path string) {
-	filepath := strings.ReplaceAll(path+"/results-"+time.DateTime, " ", "-")
+func DumpResponse(res [][]byte, path string) {
+	filepath := strings.ReplaceAll(path+"/results-"+time.Now().Format(time.RFC3339)+".csv", " ", "-")
 	f, err := os.Create(filepath)
 	if err != nil {
 		panic(err)
 	}
 
-	w, err := f.Write(res)
-	if err != nil {
-		panic(err)
+	for _, r := range res {
+		if _, err := f.Write(r); err != nil {
+			panic(err)
+		}
 	}
-
-	fmt.Printf("Wrote %d bytes\n", w)
 }

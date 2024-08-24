@@ -1,33 +1,20 @@
 package tester
 
 import (
-	"encoding/json"
-	"io"
+	"FrancisSy/web-service-performance-tester/model"
 	"log"
 	"net/http"
 	"time"
 )
 
-func CreateJsonRequestBody(s struct{}) string {
-	json, err := json.Marshal(s)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return string(json)
-}
-
-func InvokeWebService(url string) ([]byte, float64) {
+func InvokeWebService(url string) model.ResponseMetadata {
 	start := time.Now()
 	res, err := http.Get(url)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	data, err := io.ReadAll(res.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// body, err := io.ReadAll(res.Body)
 
-	return data, time.Since(start).Seconds()
+	return model.ResponseMetadata{Code: res.StatusCode, Status: "SUCCESS", Url: url, Duration: time.Since(start).Seconds()}
 }

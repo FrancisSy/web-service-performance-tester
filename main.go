@@ -1,54 +1,67 @@
 package main
 
 import (
-	"FrancisSy/web-service-performance-tester/model"
 	"FrancisSy/web-service-performance-tester/tester"
-	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
+	"net/url"
+	"os"
 )
 
+/*
+ * figure out how to design webtest
+ */
 func main() {
-	filePath := flag.String("filepath", "", "filepath of csv")
+	// check flags
+	fpath := flag.String("filepath", "", "fpath of csv")
 	apiUrl := flag.String("url", "", "web service url")
 	dumpToFile := flag.Bool("dump", false, "write response data to file")
-	dumpFilePath := flag.String("dump-filepath", "", "location of dump file")
+	dumpfpath := flag.String("dump-filepath", "", "location of dump file")
 	flag.Parse()
 
-	if len(*filePath) == 0 {
-		log.Fatal("Missing filepath")
+	if len(*fpath) == 0 {
+		log.Fatal("Missing fpath")
 	}
 
 	if len(*apiUrl) == 0 {
 		log.Fatal("Missing API URL")
 	}
 
-	contents := tester.ReadCsv(*filePath)
+	// read the csv file
+	contents := tester.ReadCsv(*fpath)
+
+	// initialize web client
+	// transport := tester.InitTransport()
+	// client := &http.Client{Transport: transport}
+	client := tester.InitWebClient()
+
+	params := url.Values{}
+	params.Add("hello", "hello")
+	arr := []interface{}{contents[0][0], contents[1][0]}
+	client.GetWithPathParams("http://pokeapi.co/api/v2/pokemon/%s/test/%s", arr)
+
+	// call the api url with the query parameters from the csv file
 	for _, c := range contents {
-		for _, s := range c {
-			fmt.Println(s)
+		res, err := client.GetWithPathParam(*apiUrl, c[0])
+		if err != nil {
 		}
+
+		defer res.Body.Close()
 	}
 
-	entries := model.PokedexEntriesResponse{}
-	data, responseTime := tester.InvokeWebService(*apiUrl)
-	fmt.Printf("%.3fs\n", responseTime)
-
-	if err := json.Unmarshal(data, &entries); err != nil {
-		log.Fatal(err)
-	}
-
-	for _, e := range entries.PokemonEntries {
-		fmt.Println(e)
-	}
-
+	// check to see if the file needs to be dumped to a path
 	if *dumpToFile {
-		if len(*dumpFilePath) == 0 {
+		if len(*dumpfpath) == 0 {
 			log.Println("Dumping result file in current directory")
+			_, err := os.Getwd()
+			if err != nil {
+				panic(err)
+			}
+
+			// tester.DumpResponse(metadata, dir)
 		} else {
-			log.Printf("Dumping result file in %s\n", *dumpFilePath)
-			tester.DumpResponse(data, *dumpFilePath)
+			log.Printf("Dumping result file in %s\n", *dumpfpath)
+			// tester.DumpResponse(metadata, *dumpfpath)
 		}
 	}
 }

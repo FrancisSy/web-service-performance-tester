@@ -127,6 +127,24 @@ func (w *WebClient) Post(url string, body []byte) (*http.Response, error) {
 	return res, err
 }
 
+func (w *WebClient) Patch(url string, body []byte) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodPatch, url, bytes.NewReader(body))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	res, err := w.client.Do(req)
+	s := res.Status + " " + url + " " + fmt.Sprintf("%.3fs", w.transport.Duration().Seconds())
+	if Is2xxSuccessful(res) {
+		color.Green(s)
+	} else {
+		color.HiRed(s)
+	}
+
+	return res, err
+}
+
 func Is2xxSuccessful(r *http.Response) bool {
 	status := r.StatusCode
 	if status >= 200 && status <= 299 {

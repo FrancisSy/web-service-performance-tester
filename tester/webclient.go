@@ -1,7 +1,9 @@
 package tester
 
 import (
+	"bytes"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -21,14 +23,20 @@ func InitWebClient() *WebClient {
 		transport: t,
 		client: http.Client{
 			Transport: t,
+			Timeout:   30 * time.Second,
 		},
 	}
 }
 
 func (w *WebClient) Get(url string) (*http.Response, error) {
-	res, err := w.client.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	res, err := w.client.Do(req)
 	s := res.Status + " " + url + " " + fmt.Sprintf("%.3fs", w.transport.Duration().Seconds())
-	if res.StatusCode == 200 {
+	if Is2xxSuccessful(res) {
 		color.Green(s)
 	} else {
 		color.HiRed(s)
@@ -44,9 +52,14 @@ func (w *WebClient) GetWithPathParam(url, p string) (*http.Response, error) {
 		url += p
 	}
 
-	res, err := w.client.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	res, err := w.client.Do(req)
 	s := res.Status + " " + url + " " + fmt.Sprintf("%.3fs", w.transport.Duration().Seconds())
-	if res.StatusCode == 200 {
+	if Is2xxSuccessful(res) {
 		color.Green(s)
 	} else {
 		color.HiRed(s)
@@ -62,9 +75,14 @@ func (w *WebClient) GetWithPathParams(url string, p []interface{}) (*http.Respon
 		url = fmt.Sprintf(url, p...)
 	}
 
-	res, err := w.client.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	res, err := w.client.Do(req)
 	s := res.Status + " " + url + " " + fmt.Sprintf("%.3fs", w.transport.Duration().Seconds())
-	if res.StatusCode == 200 {
+	if Is2xxSuccessful(res) {
 		color.Green(s)
 	} else {
 		color.HiRed(s)
@@ -75,15 +93,47 @@ func (w *WebClient) GetWithPathParams(url string, p []interface{}) (*http.Respon
 
 func (w *WebClient) GetWithQueryParams(url, ep string) (*http.Response, error) {
 	url += "?" + ep
-	res, err := w.client.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	res, err := w.client.Do(req)
 	s := res.Status + " " + url + " " + fmt.Sprintf("%.3fs", w.transport.Duration().Seconds())
-	if res.StatusCode == 200 {
+	if Is2xxSuccessful(res) {
 		color.Green(s)
 	} else {
 		color.HiRed(s)
 	}
 
 	return res, err
+}
+
+func (w *WebClient) Post(url string, body []byte) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	res, err := w.client.Do(req)
+	s := res.Status + " " + url + " " + fmt.Sprintf("%.3fs", w.transport.Duration().Seconds())
+	if Is2xxSuccessful(res) {
+		color.Green(s)
+	} else {
+		color.HiRed(s)
+	}
+
+	return res, err
+}
+
+func Is2xxSuccessful(r *http.Response) bool {
+	status := r.StatusCode
+	if status >= 200 && status <= 299 {
+		return true
+	} else {
+		return false
+	}
 }
 
 type Transport struct {

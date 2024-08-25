@@ -3,6 +3,7 @@ package main
 import (
 	"FrancisSy/web-service-performance-tester/tester"
 	"flag"
+	"fmt"
 	"log"
 	"net/url"
 	"os"
@@ -37,16 +38,25 @@ func main() {
 
 	params := url.Values{}
 	params.Add("hello", "hello")
-	arr := []interface{}{contents[0][0], contents[1][0]}
-	client.GetWithPathParams("http://pokeapi.co/api/v2/pokemon/%s/test/%s", arr)
+	// arr := []interface{}{contents[0][0], contents[1][0]}
+	// client.GetWithPathParams("http://pokeapi.co/api/v2/pokemon/%s/test/%s", arr)
 
 	// call the api url with the query parameters from the csv file
-	for _, c := range contents {
-		res, err := client.GetWithPathParam(*apiUrl, c[0])
-		if err != nil {
-		}
+	// for _, c := range contents {
+	// 	res, err := client.Get(*apiUrl + c[0])
+	// 	if err != nil {
+	// 	}
 
-		defer res.Body.Close()
+	// 	defer res.Body.Close()
+	// }
+
+	for _, c := range contents {
+		client.Post(*apiUrl, []byte(fmt.Sprintf(`
+		{
+			"name": "%s",
+			"region": "%s"
+		}
+		`, c[0], c[1])))
 	}
 
 	// check to see if the file needs to be dumped to a path

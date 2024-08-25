@@ -147,11 +147,22 @@ func (w *WebClient) Patch(url string, body []byte) (*http.Response, error) {
 
 func Is2xxSuccessful(r *http.Response) bool {
 	status := r.StatusCode
-	if status >= 200 && status <= 299 {
-		return true
-	} else {
-		return false
-	}
+	return status >= 200 && status <= 299
+}
+
+func Is3xxRedirection(r *http.Response) bool {
+	status := r.StatusCode
+	return status >= 300 && status <= 399
+}
+
+func Is4xxClientError(r *http.Response) bool {
+	status := r.StatusCode
+	return status >= 400 && status <= 499
+}
+
+func Is5xxServerError(r *http.Response) bool {
+	status := r.StatusCode
+	return status >= 500 && status <= 599
 }
 
 type Transport struct {

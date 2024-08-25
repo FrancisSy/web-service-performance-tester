@@ -1,4 +1,4 @@
-package tester
+package webtest
 
 import (
 	"encoding/csv"

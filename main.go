@@ -1,11 +1,10 @@
 package main
 
 import (
-	"FrancisSy/web-service-performance-tester/tester"
+	tester "FrancisSy/web-service-performance-tester/webtest"
 	"flag"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 )
 
@@ -31,34 +30,47 @@ func main() {
 	// read the csv file
 	contents := tester.ReadCsv(*fpath)
 
-	// initialize web client
-	// transport := tester.InitTransport()
-	// client := &http.Client{Transport: transport}
-	client := tester.InitWebClient()
+	/*
+	* initialize web client with headers
+	*
+	* can also initialize custom client
+	* transport := tester.InitTransport()
+	* client := &http.Client{Transport: transport}
+	 */
+	headers := map[string]string{}
+	headers["Content-Type"] = "application/json"
+	client := tester.InitWebClient().Headers(&headers)
 
-	params := url.Values{}
-	params.Add("hello", "hello")
-	// arr := []interface{}{contents[0][0], contents[1][0]}
-	// client.GetWithPathParams("http://pokeapi.co/api/v2/pokemon/%s/test/%s", arr)
-
-	// call the api url with the query parameters from the csv file
-	// for _, c := range contents {
-	// 	res, err := client.Get(*apiUrl + c[0])
-	// 	if err != nil {
-	// 	}
-
-	// 	defer res.Body.Close()
-	// }
-
+	// GET request with the query parameters from the csv file
 	for _, c := range contents {
-		client.Post(*apiUrl, []byte(fmt.Sprintf(`
+		res, err := client.Get(*apiUrl + c[0])
+		if err != nil {
+		}
+
+		defer res.Body.Close()
+	}
+
+	// exmaple GET request with path parameters
+	// request with query parameters would be similar
+	arr := []interface{}{contents[0][0], contents[1][0]}
+	client.Get(fmt.Sprintf("http://pokeapi.co/api/v2/pokemon/%s/test/%s", arr...))
+
+	// example POST request
+	for _, c := range contents {
+		res, err := client.Post(*apiUrl, []byte(fmt.Sprintf(`
 		{
 			"name": "%s",
 			"region": "%s"
 		}
 		`, c[0], c[1])))
+
+		if err != nil {
+		}
+
+		defer res.Body.Close()
 	}
 
+	// still working on this
 	// check to see if the file needs to be dumped to a path
 	if *dumpToFile {
 		if len(*dumpfpath) == 0 {

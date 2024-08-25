@@ -1,4 +1,4 @@
-package tester
+package webtest
 
 import (
 	"bytes"
@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/fatih/color"
@@ -14,6 +13,7 @@ import (
 
 type WebClient struct {
 	client    http.Client
+	headers   *map[string]string
 	transport *Transport
 }
 
@@ -21,54 +21,14 @@ func InitWebClient() *WebClient {
 	t := InitTransport()
 	return &WebClient{
 		transport: t,
+		headers:   nil,
 		client: http.Client{
 			Transport: t,
-			Timeout:   30 * time.Second,
 		},
 	}
 }
 
 func (w *WebClient) Get(url string) (*http.Response, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return w.execute(req, url)
-}
-
-func (w *WebClient) GetWithPathParam(url, p string) (*http.Response, error) {
-	if strings.LastIndex(url, "/") != len(url)-1 {
-		url += "/" + p
-	} else {
-		url += p
-	}
-
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return w.execute(req, url)
-}
-
-func (w *WebClient) GetWithPathParams(url string, p []interface{}) (*http.Response, error) {
-	if strings.LastIndex(url, "/") != len(url)-1 {
-		url = fmt.Sprintf(url+"/", p...)
-	} else {
-		url = fmt.Sprintf(url, p...)
-	}
-
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return w.execute(req, url)
-}
-
-func (w *WebClient) GetWithQueryParams(url, ep string) (*http.Response, error) {
-	url += "?" + ep
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		log.Fatal(err)
@@ -83,7 +43,6 @@ func (w *WebClient) Post(url string, body []byte) (*http.Response, error) {
 		log.Fatal(err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
 	return w.execute(req, url)
 }
 
@@ -93,23 +52,21 @@ func (w *WebClient) Patch(url string, body []byte) (*http.Response, error) {
 		log.Fatal(err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
 	return w.execute(req, url)
 }
 
 func (w *WebClient) Delete(url, p string) (*http.Response, error) {
-	if strings.LastIndex(url, "/") != len(url)-1 {
-		url += "/" + p
-	} else {
-		url += p
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	req, err := http.NewRequest(http.MethodDelete, url+p, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	return w.execute(req, url)
+}
+
+func (w *WebClient) Headers(m *map[string]string) *WebClient {
+	w.headers = m
+	return w
 }
 
 func SetHeaders(r *http.Request, m map[string]string) {
@@ -138,8 +95,9 @@ func Is5xxServerError(r *http.Response) bool {
 	return status >= 500 && status <= 599
 }
 
-func (w *WebClient) execute(r *http.Request, url string) (*http.Response, error) {
-	res, err := w.client.Do(r)
+func (w *WebClient) execute(req *http.Request, url string) (*http.Response, error) {
+	SetHeaders(req, *w.headers)
+	res, err := w.client.Do(req)
 	s := res.Status + " " + url + " " + fmt.Sprintf("%.3fs", w.transport.Duration().Seconds())
 	if Is2xxSuccessful(res) {
 		color.Green(s)
@@ -183,7 +141,6 @@ func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 	res, err := t.rtp.RoundTrip(r)
 	t.reqEnd = time.Now()
 	return res, err
-
 }
 
 func (t *Transport) dial(network, addr string) (net.Conn, error) {

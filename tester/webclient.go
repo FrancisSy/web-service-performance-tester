@@ -34,15 +34,7 @@ func (w *WebClient) Get(url string) (*http.Response, error) {
 		log.Fatal(err)
 	}
 
-	res, err := w.client.Do(req)
-	s := res.Status + " " + url + " " + fmt.Sprintf("%.3fs", w.transport.Duration().Seconds())
-	if Is2xxSuccessful(res) {
-		color.Green(s)
-	} else {
-		color.HiRed(s)
-	}
-
-	return res, err
+	return w.execute(req, url)
 }
 
 func (w *WebClient) GetWithPathParam(url, p string) (*http.Response, error) {
@@ -57,15 +49,7 @@ func (w *WebClient) GetWithPathParam(url, p string) (*http.Response, error) {
 		log.Fatal(err)
 	}
 
-	res, err := w.client.Do(req)
-	s := res.Status + " " + url + " " + fmt.Sprintf("%.3fs", w.transport.Duration().Seconds())
-	if Is2xxSuccessful(res) {
-		color.Green(s)
-	} else {
-		color.HiRed(s)
-	}
-
-	return res, err
+	return w.execute(req, url)
 }
 
 func (w *WebClient) GetWithPathParams(url string, p []interface{}) (*http.Response, error) {
@@ -80,15 +64,7 @@ func (w *WebClient) GetWithPathParams(url string, p []interface{}) (*http.Respon
 		log.Fatal(err)
 	}
 
-	res, err := w.client.Do(req)
-	s := res.Status + " " + url + " " + fmt.Sprintf("%.3fs", w.transport.Duration().Seconds())
-	if Is2xxSuccessful(res) {
-		color.Green(s)
-	} else {
-		color.HiRed(s)
-	}
-
-	return res, err
+	return w.execute(req, url)
 }
 
 func (w *WebClient) GetWithQueryParams(url, ep string) (*http.Response, error) {
@@ -98,15 +74,7 @@ func (w *WebClient) GetWithQueryParams(url, ep string) (*http.Response, error) {
 		log.Fatal(err)
 	}
 
-	res, err := w.client.Do(req)
-	s := res.Status + " " + url + " " + fmt.Sprintf("%.3fs", w.transport.Duration().Seconds())
-	if Is2xxSuccessful(res) {
-		color.Green(s)
-	} else {
-		color.HiRed(s)
-	}
-
-	return res, err
+	return w.execute(req, url)
 }
 
 func (w *WebClient) Post(url string, body []byte) (*http.Response, error) {
@@ -116,15 +84,7 @@ func (w *WebClient) Post(url string, body []byte) (*http.Response, error) {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	res, err := w.client.Do(req)
-	s := res.Status + " " + url + " " + fmt.Sprintf("%.3fs", w.transport.Duration().Seconds())
-	if Is2xxSuccessful(res) {
-		color.Green(s)
-	} else {
-		color.HiRed(s)
-	}
-
-	return res, err
+	return w.execute(req, url)
 }
 
 func (w *WebClient) Patch(url string, body []byte) (*http.Response, error) {
@@ -134,15 +94,22 @@ func (w *WebClient) Patch(url string, body []byte) (*http.Response, error) {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	res, err := w.client.Do(req)
-	s := res.Status + " " + url + " " + fmt.Sprintf("%.3fs", w.transport.Duration().Seconds())
-	if Is2xxSuccessful(res) {
-		color.Green(s)
+	return w.execute(req, url)
+}
+
+func (w *WebClient) Delete(url, p string) (*http.Response, error) {
+	if strings.LastIndex(url, "/") != len(url)-1 {
+		url += "/" + p
 	} else {
-		color.HiRed(s)
+		url += p
 	}
 
-	return res, err
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return w.execute(req, url)
 }
 
 func SetHeaders(r *http.Request, m map[string]string) {
@@ -169,6 +136,20 @@ func Is4xxClientError(r *http.Response) bool {
 func Is5xxServerError(r *http.Response) bool {
 	status := r.StatusCode
 	return status >= 500 && status <= 599
+}
+
+func (w *WebClient) execute(r *http.Request, url string) (*http.Response, error) {
+	res, err := w.client.Do(r)
+	s := res.Status + " " + url + " " + fmt.Sprintf("%.3fs", w.transport.Duration().Seconds())
+	if Is2xxSuccessful(res) {
+		color.Green(s)
+	} else if Is3xxRedirection(res) {
+		color.Yellow(s)
+	} else {
+		color.HiRed(s)
+	}
+
+	return res, err
 }
 
 type Transport struct {

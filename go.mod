@@ -1,4 +1,4 @@
-module FrancisSy/webtest
+module lechefran/webtest
 
 go 1.23.0
 

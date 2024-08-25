@@ -1,4 +1,4 @@
-module FrancisSy/web-service-performance-tester
+module FrancisSy/webtest
 
 go 1.23.0
 

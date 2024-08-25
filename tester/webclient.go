@@ -145,6 +145,12 @@ func (w *WebClient) Patch(url string, body []byte) (*http.Response, error) {
 	return res, err
 }
 
+func SetHeaders(r *http.Request, m map[string]string) {
+	for k, v := range m {
+		r.Header.Set(k, v)
+	}
+}
+
 func Is2xxSuccessful(r *http.Response) bool {
 	status := r.StatusCode
 	return status >= 200 && status <= 299

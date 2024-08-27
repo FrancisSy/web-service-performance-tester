@@ -1,4 +1,4 @@
-module lechefran/webtest
+module github.com/lechefran/webtest
 
 go 1.23.0
 

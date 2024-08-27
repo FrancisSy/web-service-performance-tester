@@ -3,7 +3,6 @@ package webtest
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"time"
@@ -29,38 +28,27 @@ func InitWebClient() *WebClient {
 }
 
 func (w *WebClient) Get(url string) (*http.Response, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+	req, _ := http.NewRequest(http.MethodGet, url, nil)
 	return w.execute(req, url)
 }
 
 func (w *WebClient) Post(url string, body []byte) (*http.Response, error) {
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		log.Fatal(err)
-	}
-
+	req, _ := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	return w.execute(req, url)
 }
 
 func (w *WebClient) Patch(url string, body []byte) (*http.Response, error) {
-	req, err := http.NewRequest(http.MethodPatch, url, bytes.NewReader(body))
-	if err != nil {
-		log.Fatal(err)
-	}
+	req, _ := http.NewRequest(http.MethodPatch, url, bytes.NewReader(body))
+	return w.execute(req, url)
+}
 
+func (w *WebClient) Put(url string, body []byte) (*http.Response, error) {
+	req, _ := http.NewRequest(http.MethodPut, url, bytes.NewReader(body))
 	return w.execute(req, url)
 }
 
 func (w *WebClient) Delete(url, p string) (*http.Response, error) {
-	req, err := http.NewRequest(http.MethodDelete, url+p, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+	req, _ := http.NewRequest(http.MethodDelete, url+p, nil)
 	return w.execute(req, url)
 }
 
@@ -96,7 +84,10 @@ func Is5xxServerError(r *http.Response) bool {
 }
 
 func (w *WebClient) execute(req *http.Request, url string) (*http.Response, error) {
-	SetHeaders(req, *w.headers)
+	if w.headers != nil {
+		SetHeaders(req, *w.headers)
+	}
+
 	res, err := w.client.Do(req)
 	s := res.Status + " " + url + " " + fmt.Sprintf("%.3fs", w.transport.Duration().Seconds())
 	if Is2xxSuccessful(res) {

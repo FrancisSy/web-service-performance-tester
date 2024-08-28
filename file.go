@@ -3,19 +3,27 @@ package webtest
 import (
 	"encoding/csv"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 )
 
+/*
+* general idea is that creating a new FileInfo will
+* create a results folder in the current directory
+* where all results files will be created in
+ */
 type FileInfo struct {
 	filename, filepath string
 	settings           *FileSettings
 }
 
 func InitDefaultFileInfo(fpath string) *FileInfo {
+	fname := strings.ReplaceAll("/results-"+time.Now().Format(time.RFC822)+".csv", " ", "-")
+	os.Create(fpath + "/" + fname)
 	return &FileInfo{
-		filename: "",
+		filename: fname,
 		filepath: fpath,
 		settings: InitDefaultFileSettings(),
 	}
@@ -31,32 +39,54 @@ func InitFileInfo(fpath string) *FileInfo {
 	}
 }
 
-func (f *FileInfo) WithSettings(callFlag, headerFlag, reqFlag, resFlag bool) *FileInfo {
-	if f.settings == nil {
-		f.settings = &FileSettings{
-			writeCall:     callFlag,
-			writeHeader:   headerFlag,
-			writeRequest:  reqFlag,
-			writeResponse: resFlag,
-		}
-	} else {
-		f.settings.writeCall = callFlag
-		f.settings.writeHeader = headerFlag
-		f.settings.writeRequest = reqFlag
-		f.settings.writeResponse = resFlag
-	}
-
+func (f *FileInfo) WithSettings(fs *FileSettings) *FileInfo {
+	f.settings = fs
 	return f
 }
 
-func Write(fpath string, b []byte) {
-	f, err := os.Open(fpath)
+func (f *FileInfo) Dump(req any, res *http.Response) {
+	file, err := os.Open(f.filepath + "/" + f.filename)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if _, err := f.Write(b); err != nil {
-		log.Fatal(err)
+	if f.settings.writeRequest && req != nil {
+		file.Write([]byte("Request\n"))
+		switch req.(type) {
+		case *http.Request:
+			cast, ok := req.(*http.Request)
+			if !ok {
+				log.Fatal("Error while trying to cast request to http.Request")
+			}
+
+			if f.settings.writeHeader {
+				file.Write([]byte("Response Headers\n"))
+				for k, v := range cast.Header {
+					if k == "Authorization" { // filter out auth headers
+						v1 := ""
+						for _, v2 := range v {
+							v1 += v2 + ","
+						}
+
+						file.Write([]byte(string(k + " : [" + v1[:len(v1)-1] + "]\n")))
+					}
+				}
+			} else {
+				file.Write([]byte("No request headers were provided\n"))
+			}
+		case string:
+			_, ok := req.(string)
+			if !ok {
+				log.Fatal("Error while trying to cast request to string")
+			}
+		case []string:
+			_, ok := req.([]string)
+			if !ok {
+				log.Fatal("Error while trying to cast request to []string")
+			}
+		}
+	} else {
+		file.Write([]byte("No http request was provided\n"))
 	}
 }
 
@@ -88,8 +118,19 @@ func ReadCsv(path string) [][]string {
 	return res
 }
 
-func DumpResponse(res [][]byte, path string) {
-	filepath := strings.ReplaceAll(path+"/results-"+time.Now().Format(time.RFC822)+".csv", " ", "-")
+func Write(fpath string, b []byte) {
+	f, err := os.Open(fpath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if _, err := f.Write(b); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func DumpResponse(fpath string, res [][]byte) {
+	filepath := strings.ReplaceAll(fpath+"/results-"+time.Now().Format(time.RFC822)+".csv", " ", "-")
 	f, err := os.Create(filepath)
 	if err != nil {
 		panic(err)

@@ -1,7 +1,10 @@
 package webtest
 
 import (
+	"bytes"
 	"encoding/csv"
+	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -11,16 +14,16 @@ import (
 )
 
 /*
-* general idea is that creating a new FileInfo will
+* general idea is that creating a new FileHandler will
 * create a results folder in the current directory
 * where all results files will be created in
  */
-type FileInfo struct {
+type FileHandler struct {
 	filename, filepath string
 	settings           *FileSettings
 }
 
-func InitDefaultFileInfo(fpath string) *FileInfo {
+func InitDefaultFileHandler(fpath string) *FileHandler {
 	fname := strings.ReplaceAll("/results-"+time.Now().Format(time.RFC822)+".csv", " ", "-")
 	file, err := os.Create(fpath + "/" + fname)
 	if err != nil {
@@ -29,14 +32,14 @@ func InitDefaultFileInfo(fpath string) *FileInfo {
 
 	defer file.Close()
 
-	return &FileInfo{
+	return &FileHandler{
 		filename: fname,
 		filepath: fpath,
 		settings: InitDefaultFileSettings(),
 	}
 }
 
-func InitFileInfo(fpath string) *FileInfo {
+func InitFileHandler(fpath string) *FileHandler {
 	fname := strings.ReplaceAll("/results-"+time.Now().Format(time.RFC822)+".csv", " ", "-")
 	file, err := os.Create(fpath + "/" + fname)
 	if err != nil {
@@ -45,29 +48,29 @@ func InitFileInfo(fpath string) *FileInfo {
 
 	defer file.Close()
 
-	return &FileInfo{
+	return &FileHandler{
 		filename: fname,
 		filepath: fpath,
 		settings: nil,
 	}
 }
 
-func (f *FileInfo) WithSettings(fs *FileSettings) *FileInfo {
+func (f *FileHandler) WithSettings(fs *FileSettings) *FileHandler {
 	f.settings = fs
 	return f
 }
 
 // will refactor
-func (f *FileInfo) Dump(req any, res *http.Response) {
+func (f *FileHandler) Dump(req any, res *http.Response) {
 	file, err := os.Open(f.filepath + "/" + f.filename)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	defer file.Close()
 
+	var buf bytes.Buffer
 	if f.settings.writeRequest && req != nil {
-		file.Write([]byte("Request\n"))
+		buf.Write([]byte("Request\n"))
 		switch req.(type) {
 		case *http.Request:
 			cast, ok := req.(*http.Request)
@@ -76,24 +79,24 @@ func (f *FileInfo) Dump(req any, res *http.Response) {
 			}
 
 			if f.settings.writeHeader {
-				file.Write([]byte("Request Headers\n"))
+				buf.Write([]byte("Request Headers\n"))
+				// WriteHeaders(file, &cast.Header)
 				for k, v := range cast.Header {
-					if k == "Authorization" { // filter out auth headers
-						v1 := ""
-						for _, v2 := range v {
-							v1 += v2 + ","
-						}
-
-						file.Write([]byte(string(k + " : [" + v1[:len(v1)-1] + "]\n")))
-					}
+					buf.Write([]byte(fmt.Sprintf("%s : %s", k, v)))
 				}
-
 				body, err := io.ReadAll(cast.Body)
 				if err != nil {
 					log.Fatal("Error while trying read request body")
 				}
 
-				file.Write(append(append([]byte("Request Body\n"), body...), []byte("\n")...))
+				buf.Write([]byte("Request Body\n"))
+				if err := json.Indent(&buf, body, "", "\t"); err != nil {
+					log.Fatal(err)
+				}
+				buf.Write([]byte("\n"))
+				if _, err := file.Write(append(append([]byte("Request Body\n"), body...), []byte("\n")...)); err != nil {
+					log.Fatal(err)
+				}
 			} else {
 				file.Write([]byte("No request headers were provided\n"))
 			}
@@ -103,7 +106,9 @@ func (f *FileInfo) Dump(req any, res *http.Response) {
 				log.Fatal("Error while trying to cast request to string")
 			}
 
-			file.Write(append([]byte("Request Parameter\n"), []byte(cast+"\n")...))
+			if _, err := file.Write(append([]byte("Request Parameter\n"), []byte(cast+"\n")...)); err != nil {
+				log.Fatal(err)
+			}
 		case []string:
 			cast, ok := req.([]string)
 			if !ok {
@@ -115,10 +120,28 @@ func (f *FileInfo) Dump(req any, res *http.Response) {
 				c1 += c + ","
 			}
 
-			file.Write(append([]byte("Request Parameters\n"), []byte("["+c1[:len(c1)-1]+"]")...))
+			if _, err := file.Write(append([]byte("Request Parameters\n"), []byte("["+c1[:len(c1)-1]+"]")...)); err != nil {
+				log.Fatal(err)
+			}
 		}
 	} else {
 		file.Write([]byte("No http request was provided\n"))
+	}
+
+	if f.settings.writeResponse && res != nil {
+		file.Write([]byte("Response\n"))
+
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			log.Fatal("Error while trying to read response body contents")
+		}
+
+		var pjson bytes.Buffer
+		if err := json.Indent(&pjson, body, "", "\t"); err != nil {
+			log.Fatal(err)
+		}
+
+		file.Write(append(pjson.Bytes(), []byte("\n")...))
 	}
 }
 
@@ -151,7 +174,21 @@ func ReadCsv(path string) [][]string {
 	return res
 }
 
-func Write(fpath string, b []byte) {
+func Write(file *os.File, b []byte) {
+	defer file.Close()
+
+	if _, err := file.Write(b); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func WriteToOpenFile(file *os.File, b []byte) {
+	if _, err := file.Write(b); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func WriteTo(fpath string, b []byte) {
 	file, err := os.Open(fpath)
 	if err != nil {
 		log.Fatal(err)
@@ -161,6 +198,19 @@ func Write(fpath string, b []byte) {
 
 	if _, err := file.Write(b); err != nil {
 		log.Fatal(err)
+	}
+}
+
+func WriteHeaders(file *os.File, headers *http.Header) {
+	for k, v := range *headers {
+		if k != "Authorization" { // filter out auth headers
+			v1 := ""
+			for _, v2 := range v {
+				v1 += v2 + ","
+			}
+
+			file.Write([]byte(string(k + " : [" + v1[:len(v1)-1] + "]\n")))
+		}
 	}
 }
 
